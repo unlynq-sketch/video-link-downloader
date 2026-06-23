@@ -128,19 +128,20 @@
 
     <section>
       <ol>
-        <li>Double-click <strong>Install Video Link Downloader.command</strong>.</li>
+        <li>Click <strong>Copy Mac Install Command</strong>.</li>
+        <li>Open the Mac <strong>Terminal</strong> app.</li>
+        <li>Paste the copied command, then press <strong>Enter</strong>.</li>
         <li>When Chrome opens, turn on <strong>Developer mode</strong>.</li>
         <li>Click <strong>Load unpacked</strong>.</li>
         <li>Select the <strong>extension</strong> folder from this same package.</li>
-        <li>Pin the extension and paste a YouTube or Instagram link.</li>
       </ol>
 
       <div class="note">
-        If Mac says Apple could not verify the installer, use this once:
+        This avoids the Apple verification popup for the downloaded command file:
         <div class="fix">
-          <code id="fixCommand">xattr -dr com.apple.quarantine "/path/to/video-link-downloader-mac"</code>
-          <button id="copyFix" type="button">Copy Fix Command</button>
-          <span class="small">Open Terminal, paste the copied command, press Enter, then open the installer again.</span>
+          <code id="installCommand">xattr -dr com.apple.quarantine "/path/to/video-link-downloader-mac" && zsh "/path/to/video-link-downloader-mac/Install Video Link Downloader.command"</code>
+          <button id="copyInstall" type="button">Copy Mac Install Command</button>
+          <span class="small">You only need to paste this once during setup.</span>
         </div>
       </div>
     </section>
@@ -150,16 +151,16 @@
     const folder = decodeURIComponent(window.location.pathname)
       .replace(/^\/private\//, "/")
       .replace(/\/OPEN FIRST - Mac Setup\.html$/, "");
-    const command = `xattr -dr com.apple.quarantine "${folder}"`;
-    const code = document.getElementById("fixCommand");
-    const copy = document.getElementById("copyFix");
+    const command = `xattr -dr com.apple.quarantine "${folder}" && zsh "${folder}/Install Video Link Downloader.command"`;
+    const code = document.getElementById("installCommand");
+    const copy = document.getElementById("copyInstall");
 
     code.textContent = command;
     copy.addEventListener("click", async () => {
       await navigator.clipboard.writeText(command);
       copy.textContent = "Copied";
       setTimeout(() => {
-        copy.textContent = "Copy Fix Command";
+        copy.textContent = "Copy Mac Install Command";
       }, 1600);
     });
   </script>

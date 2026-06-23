@@ -4,7 +4,7 @@ Open the START HERE file for your computer:
 
 Mac:
 OPEN FIRST - Mac Setup.html
-Then open Install Video Link Downloader.command
+Then copy the Mac install command into Terminal
 
 Windows:
 START HERE - Windows.bat

@@ -21,11 +21,12 @@ Simple way:
 
 1. Unzip `video-link-downloader-mac.zip`.
 2. Open `OPEN FIRST - Mac Setup.html`.
-3. Open `Install Video Link Downloader.command`.
-4. In Chrome, click `Load unpacked`.
-5. Select the `extension` folder.
+3. Click `Copy Mac Install Command`.
+4. Open Terminal, paste it, and press Enter.
+5. In Chrome, click `Load unpacked`.
+6. Select the `extension` folder.
 
-If macOS says Apple could not verify the installer, the setup page shows the exact one-time Terminal command to allow this downloaded folder. A fully warning-free Mac installer requires Apple signing and notarization.
+This avoids double-clicking a downloaded `.command` file, which is what triggers the Apple verification warning. A fully warning-free Mac installer requires Apple signing and notarization.
 
 For a Mac package, use:
 
