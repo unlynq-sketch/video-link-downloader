@@ -44,7 +44,8 @@ if [[ ! -x ".venv/bin/python" ]] || ! ".venv/bin/python" -m yt_dlp --version >/d
   rm -rf .venv
   "$PYTHON_BIN" -m venv .venv
   ".venv/bin/python" -m pip install --upgrade pip
-  ".venv/bin/python" -m pip install --upgrade yt-dlp imageio-ffmpeg
+  ".venv/bin/python" -m pip install --upgrade --pre yt-dlp
+  ".venv/bin/python" -m pip install --upgrade imageio-ffmpeg curl-cffi
 fi
 
 cat > "$INSTALL_DIR/start-helper.command" <<EOF

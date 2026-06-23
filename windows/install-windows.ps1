@@ -76,7 +76,8 @@ try {
       & $python -m venv .venv
     }
     & $venvPython -m pip install --upgrade pip
-    & $venvPython -m pip install --upgrade yt-dlp imageio-ffmpeg
+    & $venvPython -m pip install --upgrade --pre yt-dlp
+    & $venvPython -m pip install --upgrade imageio-ffmpeg curl-cffi
   }
 } finally {
   Pop-Location

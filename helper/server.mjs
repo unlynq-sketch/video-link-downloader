@@ -17,6 +17,15 @@ const localYtDlp = isWindows
 const localPython = isWindows
   ? join(appDir, ".venv", "Scripts", "python.exe")
   : join(appDir, ".venv", "bin", "python");
+const bundledNodeBin = join(
+  process.env.HOME || "/Users/amanrana",
+  ".cache",
+  "codex-runtimes",
+  "codex-primary-runtime",
+  "dependencies",
+  "node",
+  "bin"
+);
 const jobs = new Map();
 const children = new Map();
 const EXTRACT_TIMEOUT_MS = 45_000;
@@ -298,7 +307,7 @@ function humanError({ text, platform }) {
       lower.includes("unable to continue")
     )
   ) {
-    return "YouTube blocked this stream. Try logging into YouTube in Chrome, then retry.";
+    return "YouTube blocked this stream. Open the video in Chrome, make sure you are logged in, then retry. If it still fails, this link is currently blocked by YouTube.";
   }
 
   if (platform === "youtube" && lower.includes("sign in to confirm")) {
