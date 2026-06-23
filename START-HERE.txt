@@ -1,0 +1,13 @@
+Video Link Downloader
+
+Open the START HERE file for your computer:
+
+Mac:
+START HERE - Mac.command
+
+Windows:
+START HERE - Windows.bat
+
+Chrome does not allow a downloaded extension to install itself silently.
+The START HERE file installs the helper and opens Chrome Extensions for you.
+Then choose Load unpacked and select the extension folder.

@@ -1,0 +1,14 @@
+.DS_Store
+
+# Local helper runtime
+helper/.venv/
+helper/.venv-py39-backup/
+helper/downloads/
+helper/helper.log
+
+# Built package folders are temporary. Keep only the zip files in dist.
+dist/video-link-downloader-mac/
+dist/video-link-downloader-windows/
+
+# Tiny local test media used during development
+test-media/

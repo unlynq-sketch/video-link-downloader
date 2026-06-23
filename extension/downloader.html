@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Video Link Downloader</title>
+    <link rel="stylesheet" href="downloader.css">
+  </head>
+  <body>
+    <main class="shell">
+      <header>
+        <h1>Video Link Downloader</h1>
+        <p id="helperStatus">Checking helper...</p>
+      </header>
+
+      <label class="field">
+        <span>Media link</span>
+        <textarea
+          id="url"
+          rows="4"
+          placeholder="Paste a YouTube or Instagram video link"
+          autocomplete="off"
+          autocapitalize="off"
+          spellcheck="false"
+        ></textarea>
+      </label>
+
+      <div class="platform">
+        <span>Platform</span>
+        <strong id="platform">Waiting for link</strong>
+      </div>
+
+      <div class="format-row" role="radiogroup" aria-label="Download format">
+        <label>
+          <input type="radio" name="format" value="mp4" checked>
+          <span>MP4 video</span>
+        </label>
+        <label>
+          <input type="radio" name="format" value="mp3">
+          <span>MP3 audio</span>
+        </label>
+      </div>
+
+      <button id="download" type="button">Download highest quality</button>
+
+      <section class="status" aria-live="polite">
+        <strong id="state">Ready</strong>
+        <div class="progress" aria-label="Download progress">
+          <div id="progressBar"></div>
+        </div>
+        <div class="meta" id="meta"></div>
+        <p id="details">Paste a YouTube or Instagram video link, choose a format, then start the download.</p>
+      </section>
+    </main>
+    <script src="downloader.js"></script>
+  </body>
+</html>
