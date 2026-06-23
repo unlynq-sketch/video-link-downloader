@@ -148,6 +148,13 @@ button {
   color: #20242a;
 }
 
+.secondary-action {
+  min-height: 36px;
+  border: 1px solid #cdd3da;
+  background: #ffffff;
+  color: #20242a;
+}
+
 button:disabled {
   cursor: not-allowed;
   opacity: 0.56;

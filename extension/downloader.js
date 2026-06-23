@@ -3,6 +3,7 @@ const API = "http://localhost:8787";
 const urlInput = document.querySelector("#url");
 const downloadButton = document.querySelector("#download");
 const clearButton = document.querySelector("#clear");
+const updateHelperButton = document.querySelector("#updateHelper");
 const helperStatus = document.querySelector("#helperStatus");
 const platformLabel = document.querySelector("#platform");
 const state = document.querySelector("#state");
@@ -106,10 +107,29 @@ async function checkHelper() {
   try {
     const response = await fetch(`${API}/api/health`);
     if (!response.ok) throw new Error("Helper unavailable");
-    helperStatus.textContent = "Helper connected";
+    const health = await response.json();
+    helperStatus.textContent = health.version
+      ? `Helper connected • ${health.version}`
+      : "Helper connected";
   } catch {
     helperStatus.textContent = "Start the local helper before downloading";
   }
+}
+
+async function waitForHelperRestart() {
+  for (let attempt = 0; attempt < 18; attempt += 1) {
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    try {
+      const response = await fetch(`${API}/api/health`);
+      if (response.ok) {
+        await checkHelper();
+        return true;
+      }
+    } catch {
+      // Helper is expected to disappear briefly while restarting.
+    }
+  }
+  return false;
 }
 
 function resetLinkInput() {
@@ -264,6 +284,36 @@ clearButton.addEventListener("click", () => {
   resetLinkInput();
   updatePlatform();
   resetPanelStatus();
+});
+
+updateHelperButton.addEventListener("click", async () => {
+  clearActiveJob();
+  downloadButton.disabled = true;
+  updateHelperButton.disabled = true;
+  setStatus("Updating", "Updating helper and downloader engine...", { progress: 8 });
+
+  try {
+    const response = await fetch(`${API}/api/update`, { method: "POST" });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || "Update failed.");
+
+    setStatus("Restarting", result.message || "Helper updated. Waiting for restart...", {
+      progress: 70
+    });
+    const restarted = await waitForHelperRestart();
+    setStatus(
+      restarted ? "Updated" : "Check helper",
+      restarted
+        ? "Helper updated. Paste a link to start again."
+        : "Update finished, but helper did not reconnect yet. Wait a few seconds, then click Clear.",
+      { progress: restarted ? 100 : 70 }
+    );
+  } catch (error) {
+    setStatus("Update failed", error.message);
+  } finally {
+    downloadButton.disabled = false;
+    updateHelperButton.disabled = false;
+  }
 });
 
 checkHelper();

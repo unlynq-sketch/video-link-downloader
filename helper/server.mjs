@@ -1,6 +1,6 @@
 import { createServer } from "node:http";
 import { spawn } from "node:child_process";
-import { mkdir, rename, unlink } from "node:fs/promises";
+import { mkdir, rename, unlink, writeFile } from "node:fs/promises";
 import { basename, dirname, join, resolve } from "node:path";
 import { randomUUID } from "node:crypto";
 import { createReadStream, existsSync, readdirSync, statSync } from "node:fs";
@@ -8,6 +8,8 @@ import { fileURLToPath } from "node:url";
 
 const PORT = 8787;
 const HOST = "localhost";
+const HELPER_VERSION = "2026.06.23.2";
+const REPO_RAW_BASE = "https://raw.githubusercontent.com/unlynq-sketch/video-link-downloader/main";
 const appDir = dirname(fileURLToPath(import.meta.url));
 const downloadsDir = join(appDir, "downloads");
 const isWindows = process.platform === "win32";
@@ -29,6 +31,11 @@ const bundledNodeBin = join(
 const jobs = new Map();
 const children = new Map();
 const EXTRACT_TIMEOUT_MS = 45_000;
+let updateState = {
+  status: "idle",
+  message: "Ready",
+  updatedAt: ""
+};
 
 await mkdir(downloadsDir, { recursive: true });
 
@@ -66,6 +73,18 @@ function sendJson(res, status, body) {
     "access-control-allow-private-network": "true"
   });
   res.end(json);
+}
+
+async function fetchText(url) {
+  const response = await fetch(url, {
+    headers: {
+      "user-agent": `VideoLinkDownloaderHelper/${HELPER_VERSION}`
+    }
+  });
+  if (!response.ok) {
+    throw new Error(`Could not download update file (${response.status}).`);
+  }
+  return response.text();
 }
 
 function sendFile(res, filePath, options = {}) {
@@ -115,6 +134,105 @@ async function deleteJobFile(job) {
   job.fileName = "";
   job.cleanedUp = true;
   return true;
+}
+
+async function runUpdateCommand(command, args) {
+  return runProcess(command, args, {
+    cwd: appDir,
+    env: {
+      ...process.env,
+      PATH: existsSync(bundledNodeBin)
+        ? `${bundledNodeBin}:${process.env.PATH || ""}`
+        : process.env.PATH
+    }
+  });
+}
+
+async function updatePythonPackages() {
+  if (!existsSync(localPython)) {
+    throw new Error("Local Python engine is missing. Run the installer again.");
+  }
+
+  updateState.message = "Updating downloader engine...";
+  await runUpdateCommand(localPython, ["-m", "pip", "install", "--upgrade", "pip"]);
+  await runUpdateCommand(localPython, ["-m", "pip", "install", "--upgrade", "--pre", "yt-dlp"]);
+  await runUpdateCommand(localPython, ["-m", "pip", "install", "--upgrade", "imageio-ffmpeg", "curl-cffi"]);
+}
+
+async function updateHelperFiles() {
+  updateState.message = "Updating helper files...";
+  const files = ["helper/server.mjs", "helper/package.json"];
+
+  for (const file of files) {
+    const targetPath = join(appDir, basename(file));
+    const tempPath = `${targetPath}.update`;
+    const text = await fetchText(`${REPO_RAW_BASE}/${file}`);
+    await writeFile(tempPath, text, "utf8");
+    await rename(tempPath, targetPath);
+  }
+}
+
+function scheduleRestart() {
+  updateState.message = "Restarting helper...";
+
+  setTimeout(() => {
+    if (process.platform === "darwin") {
+      const child = spawn("zsh", [
+        "-lc",
+        `sleep 1; launchctl kickstart -k "gui/$(id -u)/com.amanrana.video-link-downloader-helper" >/dev/null 2>&1 || "${process.execPath}" "${join(appDir, "server.mjs")}"`
+      ], {
+        cwd: appDir,
+        detached: true,
+        stdio: "ignore"
+      });
+      child.unref();
+      process.exit(0);
+      return;
+    }
+
+    const child = spawn(process.execPath, [join(appDir, "server.mjs")], {
+      cwd: appDir,
+      detached: true,
+      stdio: "ignore"
+    });
+    child.unref();
+    process.exit(0);
+  }, 750);
+}
+
+async function updateHelper() {
+  if (updateState.status === "running") {
+    return updateState;
+  }
+
+  if (activeJob()) {
+    throw new Error("Wait for the current download to finish before updating.");
+  }
+
+  updateState = {
+    status: "running",
+    message: "Starting update...",
+    updatedAt: new Date().toISOString()
+  };
+
+  try {
+    await updatePythonPackages();
+    await updateHelperFiles();
+    updateState = {
+      status: "restarting",
+      message: "Updated. Restarting helper...",
+      updatedAt: new Date().toISOString()
+    };
+    scheduleRestart();
+    return updateState;
+  } catch (error) {
+    updateState = {
+      status: "failed",
+      message: error.message,
+      updatedAt: new Date().toISOString()
+    };
+    throw error;
+  }
 }
 
 function readBody(req) {
@@ -487,7 +605,25 @@ const server = createServer(async (req, res) => {
   }
 
   if (req.method === "GET" && req.url === "/api/health") {
-    sendJson(res, 200, { ok: true });
+    sendJson(res, 200, { ok: true, version: HELPER_VERSION });
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/api/update") {
+    sendJson(res, 200, updateState);
+    return;
+  }
+
+  if (req.method === "POST" && req.url === "/api/update") {
+    try {
+      const state = await updateHelper();
+      sendJson(res, 202, state);
+    } catch (error) {
+      sendJson(res, 400, {
+        status: "failed",
+        message: error.message
+      });
+    }
     return;
   }
 
