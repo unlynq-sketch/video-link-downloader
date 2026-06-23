@@ -2,12 +2,23 @@
 set -euo pipefail
 
 SCRIPT_DIR="${0:A:h}"
-PROJECT_DIR="${SCRIPT_DIR:h}"
+
+if [[ -f "$SCRIPT_DIR/install-mac.command" ]]; then
+  INSTALLER_PATH="$SCRIPT_DIR/install-mac.command"
+  PROJECT_DIR="${SCRIPT_DIR:h}"
+elif [[ -f "$SCRIPT_DIR/mac/install-mac.command" ]]; then
+  INSTALLER_PATH="$SCRIPT_DIR/mac/install-mac.command"
+  PROJECT_DIR="$SCRIPT_DIR"
+else
+  echo "Could not find the Mac installer in this package."
+  echo "Please unzip the full video-link-downloader-mac folder and try again."
+  exit 1
+fi
 
 echo "Video Link Downloader"
 echo ""
 echo "Step 1 of 2: installing the local helper..."
-"$SCRIPT_DIR/install-mac.command"
+"$INSTALLER_PATH"
 
 echo ""
 echo "Step 2 of 2: opening Chrome Extensions."
