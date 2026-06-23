@@ -20,9 +20,12 @@ For now, every other platform is blocked on purpose.
 Simple way:
 
 1. Unzip `video-link-downloader-mac.zip`.
-2. Open `START HERE - Mac.command`.
-3. In Chrome, click `Load unpacked`.
-4. Select the `extension` folder.
+2. Open `OPEN FIRST - Mac Setup.html`.
+3. Open `Install Video Link Downloader.command`.
+4. In Chrome, click `Load unpacked`.
+5. Select the `extension` folder.
+
+If macOS says Apple could not verify the installer, the setup page shows the exact one-time Terminal command to allow this downloaded folder. A fully warning-free Mac installer requires Apple signing and notarization.
 
 For a Mac package, use:
 

@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Video Link Downloader Mac Setup</title>
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: #172033;
+      background: #f5f7fb;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 32px;
+    }
+
+    main {
+      width: min(760px, 100%);
+      background: #ffffff;
+      border: 1px solid #dde3ee;
+      border-radius: 16px;
+      box-shadow: 0 18px 55px rgba(26, 41, 65, 0.12);
+      overflow: hidden;
+    }
+
+    header {
+      display: flex;
+      gap: 18px;
+      align-items: center;
+      padding: 28px 30px 22px;
+      border-bottom: 1px solid #edf1f7;
+    }
+
+    header img {
+      width: 64px;
+      height: 64px;
+      border-radius: 16px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 28px;
+      line-height: 1.1;
+    }
+
+    .sub {
+      margin: 6px 0 0;
+      color: #647086;
+      font-size: 15px;
+    }
+
+    section {
+      padding: 26px 30px;
+    }
+
+    ol {
+      margin: 0;
+      padding-left: 22px;
+      display: grid;
+      gap: 18px;
+      font-size: 17px;
+      line-height: 1.45;
+    }
+
+    strong {
+      color: #0f172a;
+    }
+
+    .note {
+      margin-top: 22px;
+      padding: 16px;
+      border: 1px solid #dbe7ff;
+      background: #f2f7ff;
+      border-radius: 12px;
+      color: #40516f;
+      line-height: 1.45;
+    }
+
+    .fix {
+      margin-top: 14px;
+      display: grid;
+      gap: 10px;
+    }
+
+    code {
+      display: block;
+      overflow-x: auto;
+      padding: 12px;
+      border-radius: 10px;
+      background: #101828;
+      color: #f8fafc;
+      font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      white-space: pre;
+    }
+
+    button {
+      justify-self: start;
+      border: 0;
+      border-radius: 10px;
+      padding: 11px 14px;
+      background: #1677ff;
+      color: white;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .small {
+      color: #6c788d;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <img src="extension/icons/icon-128.png" alt="">
+      <div>
+        <h1>Video Link Downloader</h1>
+        <p class="sub">Mac setup in one clear path.</p>
+      </div>
+    </header>
+
+    <section>
+      <ol>
+        <li>Double-click <strong>Install Video Link Downloader.command</strong>.</li>
+        <li>When Chrome opens, turn on <strong>Developer mode</strong>.</li>
+        <li>Click <strong>Load unpacked</strong>.</li>
+        <li>Select the <strong>extension</strong> folder from this same package.</li>
+        <li>Pin the extension and paste a YouTube or Instagram link.</li>
+      </ol>
+
+      <div class="note">
+        If Mac says Apple could not verify the installer, use this once:
+        <div class="fix">
+          <code id="fixCommand">xattr -dr com.apple.quarantine "/path/to/video-link-downloader-mac"</code>
+          <button id="copyFix" type="button">Copy Fix Command</button>
+          <span class="small">Open Terminal, paste the copied command, press Enter, then open the installer again.</span>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const folder = decodeURIComponent(window.location.pathname)
+      .replace(/^\/private\//, "/")
+      .replace(/\/OPEN FIRST - Mac Setup\.html$/, "");
+    const command = `xattr -dr com.apple.quarantine "${folder}"`;
+    const code = document.getElementById("fixCommand");
+    const copy = document.getElementById("copyFix");
+
+    code.textContent = command;
+    copy.addEventListener("click", async () => {
+      await navigator.clipboard.writeText(command);
+      copy.textContent = "Copied";
+      setTimeout(() => {
+        copy.textContent = "Copy Fix Command";
+      }, 1600);
+    });
+  </script>
+</body>
+</html>
