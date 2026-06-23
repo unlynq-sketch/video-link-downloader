@@ -2,6 +2,7 @@ const API = "http://localhost:8787";
 
 const urlInput = document.querySelector("#url");
 const downloadButton = document.querySelector("#download");
+const clearButton = document.querySelector("#clear");
 const helperStatus = document.querySelector("#helperStatus");
 const platformLabel = document.querySelector("#platform");
 const state = document.querySelector("#state");
@@ -77,6 +78,16 @@ function setStatus(title, message, options = {}) {
   setProgress(options.progress || 0);
 }
 
+function clearActiveJob() {
+  localStorage.removeItem(activeJobKey);
+}
+
+function resetPanelStatus() {
+  clearActiveJob();
+  downloadButton.disabled = false;
+  setStatus("Ready", "Paste a YouTube or Instagram video link, choose a format, then start the download.");
+}
+
 function sendToChromeDownloads(job) {
   if (!job.fileName) return false;
 
@@ -117,11 +128,12 @@ async function pollJob(id) {
   const job = await response.json();
 
   if (!response.ok) {
+    clearActiveJob();
     throw new Error(job.error || "Could not read job status.");
   }
 
   if (job.status === "complete") {
-    localStorage.removeItem(activeJobKey);
+    clearActiveJob();
     setStatus("Complete", "Download finished. Sending it to Chrome Downloads...", {
       progress: 100,
       meta: job.fileName || "Finished"
@@ -142,7 +154,7 @@ async function pollJob(id) {
   }
 
   if (job.status === "failed") {
-    localStorage.removeItem(activeJobKey);
+    clearActiveJob();
     setStatus("Failed", job.error || "Download failed.", {
       progress: job.progressPercent || 0
     });
@@ -155,6 +167,7 @@ async function pollJob(id) {
     meta: formatJobMeta(job)
   });
   setTimeout(() => pollJob(id).catch(error => {
+    clearActiveJob();
     setStatus("Failed", error.message);
     downloadButton.disabled = false;
   }), 1000);
@@ -165,7 +178,14 @@ async function restoreActiveJob() {
   if (savedJob) {
     downloadButton.disabled = true;
     setStatus("Reconnecting", "Restoring the active download...", { progress: 4 });
-    pollJob(savedJob);
+    pollJob(savedJob).catch(error => {
+      clearActiveJob();
+      setStatus("Ready", "Old download cleared. Paste a link to start again.", {
+        progress: 0,
+        meta: error.message
+      });
+      downloadButton.disabled = false;
+    });
     return;
   }
 
@@ -182,7 +202,7 @@ async function restoreActiveJob() {
     });
     pollJob(job.id);
   } catch {
-    // No active helper job to restore.
+    clearActiveJob();
   }
 }
 
@@ -233,12 +253,18 @@ downloadButton.addEventListener("click", async () => {
     });
     pollJob(job.id);
   } catch (error) {
+    clearActiveJob();
     setStatus("Could not start", error.message);
     downloadButton.disabled = false;
   }
 });
 
 urlInput.addEventListener("input", updatePlatform);
+clearButton.addEventListener("click", () => {
+  resetLinkInput();
+  updatePlatform();
+  resetPanelStatus();
+});
 
 checkHelper();
 resetLinkInput();
