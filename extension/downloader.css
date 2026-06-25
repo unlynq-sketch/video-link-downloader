@@ -47,6 +47,10 @@ p {
   font-weight: 700;
 }
 
+.compact-field {
+  gap: 6px;
+}
+
 textarea {
   width: 100%;
   resize: vertical;
@@ -63,6 +67,24 @@ textarea {
 }
 
 textarea:focus {
+  border-color: #2878d9;
+  box-shadow: 0 0 0 3px rgba(40, 120, 217, 0.14);
+}
+
+select {
+  min-height: 38px;
+  width: 100%;
+  border: 1px solid #cdd3da;
+  border-radius: 8px;
+  padding: 0 10px;
+  background: #ffffff;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 650;
+  outline: none;
+}
+
+select:focus {
   border-color: #2878d9;
   box-shadow: 0 0 0 3px rgba(40, 120, 217, 0.14);
 }
@@ -155,6 +177,12 @@ button {
   color: #20242a;
 }
 
+.secondary-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
 button:disabled {
   cursor: not-allowed;
   opacity: 0.56;
@@ -179,6 +207,7 @@ button:disabled {
   max-height: 58px;
   overflow: auto;
   overflow-wrap: anywhere;
+  white-space: pre-line;
 }
 
 .progress {

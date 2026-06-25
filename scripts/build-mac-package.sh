@@ -13,6 +13,7 @@ rsync -a "$ROOT_DIR/extension/" "$PACKAGE_DIR/extension/"
 rsync -a "$ROOT_DIR/helper/" "$PACKAGE_DIR/helper/" \
   --exclude "downloads/" \
   --exclude ".venv-py39-backup/" \
+  --exclude "config.json" \
   --exclude "helper.log"
 rsync -a "$ROOT_DIR/mac/" "$PACKAGE_DIR/mac/"
 cp "$ROOT_DIR/mac/Install Video Link Downloader.command" "$PACKAGE_DIR/Install Video Link Downloader.command"

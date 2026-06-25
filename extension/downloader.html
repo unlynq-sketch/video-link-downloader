@@ -41,12 +41,22 @@
         </label>
       </div>
 
+      <label class="field compact-field">
+        <span>Chrome profile</span>
+        <select id="chromeProfile">
+          <option value="">Loading profiles...</option>
+        </select>
+      </label>
+
       <div class="actions">
         <button id="download" type="button">Download highest quality</button>
         <button id="clear" type="button">Clear</button>
       </div>
 
-      <button id="updateHelper" class="secondary-action" type="button">Update helper</button>
+      <div class="secondary-actions">
+        <button id="diagnostics" class="secondary-action" type="button">Run diagnostics</button>
+        <button id="updateHelper" class="secondary-action" type="button">Update helper</button>
+      </div>
 
       <section class="status" aria-live="polite">
         <strong id="state">Ready</strong>

@@ -4,6 +4,8 @@ const urlInput = document.querySelector("#url");
 const downloadButton = document.querySelector("#download");
 const clearButton = document.querySelector("#clear");
 const updateHelperButton = document.querySelector("#updateHelper");
+const diagnosticsButton = document.querySelector("#diagnostics");
+const chromeProfileSelect = document.querySelector("#chromeProfile");
 const helperStatus = document.querySelector("#helperStatus");
 const platformLabel = document.querySelector("#platform");
 const state = document.querySelector("#state");
@@ -111,8 +113,10 @@ async function checkHelper() {
     helperStatus.textContent = health.version
       ? `Helper connected • ${health.version}`
       : "Helper connected";
+    await loadProfiles();
   } catch {
     helperStatus.textContent = "Start the local helper before downloading";
+    chromeProfileSelect.innerHTML = '<option value="">Helper not connected</option>';
   }
 }
 
@@ -141,6 +145,47 @@ function updatePlatform() {
   const url = cleanMediaUrl(urlInput.value);
   const platform = detectPlatform(url);
   platformLabel.textContent = platform || (urlInput.value.trim() ? "Unsupported link" : "Waiting for link");
+}
+
+function profileLabel(profile) {
+  const parts = [profile.name || profile.id];
+  if (profile.isLastUsed) parts.push("last used");
+  if (profile.signedIn) parts.push("signed in");
+  if (!profile.hasCookies) parts.push("no cookies");
+  return `${parts.join(" • ")} (${profile.id})`;
+}
+
+async function loadProfiles() {
+  const response = await fetch(`${API}/api/profiles`);
+  if (!response.ok) throw new Error("Could not load Chrome profiles.");
+  const data = await response.json();
+  const profiles = data.profiles || [];
+
+  chromeProfileSelect.innerHTML = "";
+
+  const automatic = document.createElement("option");
+  automatic.value = "";
+  automatic.textContent = "Automatic Chrome profile";
+  chromeProfileSelect.append(automatic);
+
+  for (const profile of profiles) {
+    const option = document.createElement("option");
+    option.value = profile.id;
+    option.textContent = profileLabel(profile);
+    chromeProfileSelect.append(option);
+  }
+
+  chromeProfileSelect.value = data.selected || "";
+
+  if (!profiles.length) {
+    chromeProfileSelect.innerHTML = '<option value="">No Chrome profiles found</option>';
+  }
+}
+
+function summarizeDiagnostics(result) {
+  const failed = (result.checks || []).filter(check => !check.ok);
+  const checks = failed.length ? failed : (result.checks || []).slice(-4);
+  return checks.map(check => `${check.ok ? "OK" : "Fix"}: ${check.name} - ${check.message}`).join("\n");
 }
 
 async function pollJob(id) {
@@ -284,6 +329,52 @@ clearButton.addEventListener("click", () => {
   resetLinkInput();
   updatePlatform();
   resetPanelStatus();
+});
+
+chromeProfileSelect.addEventListener("change", async () => {
+  try {
+    const response = await fetch(`${API}/api/profile`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ profile: chromeProfileSelect.value })
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || "Could not save Chrome profile.");
+    setStatus(
+      "Profile saved",
+      chromeProfileSelect.value
+        ? "Downloads will use this Chrome profile for cookies."
+        : "Downloads will use automatic Chrome profile detection.",
+      { progress: 0 }
+    );
+  } catch (error) {
+    setStatus("Profile error", error.message);
+  }
+});
+
+diagnosticsButton.addEventListener("click", async () => {
+  diagnosticsButton.disabled = true;
+  setStatus("Checking", "Running helper diagnostics...", { progress: 12 });
+
+  try {
+    const url = encodeURIComponent(cleanMediaUrl(urlInput.value));
+    const response = await fetch(`${API}/api/diagnostics${url ? `?url=${url}` : ""}`);
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || "Diagnostics failed.");
+
+    setStatus(
+      result.ok ? "Diagnostics OK" : "Diagnostics found issues",
+      summarizeDiagnostics(result) || "No issues found.",
+      {
+        progress: result.ok ? 100 : 40,
+        meta: result.ytDlpVersion ? `yt-dlp ${result.ytDlpVersion}` : ""
+      }
+    );
+  } catch (error) {
+    setStatus("Diagnostics failed", error.message);
+  } finally {
+    diagnosticsButton.disabled = false;
+  }
 });
 
 updateHelperButton.addEventListener("click", async () => {

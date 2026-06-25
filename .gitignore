@@ -3,6 +3,7 @@
 # Local helper runtime
 helper/.venv/
 helper/.venv-py39-backup/
+helper/config.json
 helper/downloads/
 helper/helper.log
 

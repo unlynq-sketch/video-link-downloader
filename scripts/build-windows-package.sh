@@ -14,6 +14,7 @@ rsync -a "$ROOT_DIR/helper/" "$PACKAGE_DIR/helper/" \
   --exclude "downloads/" \
   --exclude ".venv/" \
   --exclude ".venv-py39-backup/" \
+  --exclude "config.json" \
   --exclude "helper.log"
 rsync -a "$ROOT_DIR/windows/" "$PACKAGE_DIR/windows/"
 cp "$ROOT_DIR/windows/START HERE - Windows.bat" "$PACKAGE_DIR/START HERE - Windows.bat"

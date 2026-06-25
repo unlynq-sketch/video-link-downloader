@@ -1,17 +1,18 @@
 import { createServer } from "node:http";
 import { spawn } from "node:child_process";
-import { mkdir, rename, unlink, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import { basename, dirname, join, resolve } from "node:path";
 import { randomUUID } from "node:crypto";
 import { createReadStream, existsSync, readdirSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
-const PORT = 8787;
+const PORT = Number(process.env.VLD_PORT || 8787);
 const HOST = "localhost";
-const HELPER_VERSION = "2026.06.23.2";
+const HELPER_VERSION = "2026.06.24.1";
 const REPO_RAW_BASE = "https://raw.githubusercontent.com/unlynq-sketch/video-link-downloader/main";
 const appDir = dirname(fileURLToPath(import.meta.url));
 const downloadsDir = join(appDir, "downloads");
+const configPath = join(appDir, "config.json");
 const isWindows = process.platform === "win32";
 const localYtDlp = isWindows
   ? join(appDir, ".venv", "Scripts", "yt-dlp.exe")
@@ -31,6 +32,9 @@ const bundledNodeBin = join(
 const jobs = new Map();
 const children = new Map();
 const EXTRACT_TIMEOUT_MS = 45_000;
+const DEFAULT_CONFIG = {
+  chromeProfile: ""
+};
 let updateState = {
   status: "idle",
   message: "Ready",
@@ -38,6 +42,24 @@ let updateState = {
 };
 
 await mkdir(downloadsDir, { recursive: true });
+
+async function readConfig() {
+  try {
+    return {
+      ...DEFAULT_CONFIG,
+      ...JSON.parse(await readFile(configPath, "utf8"))
+    };
+  } catch {
+    return { ...DEFAULT_CONFIG };
+  }
+}
+
+async function writeConfig(config) {
+  await writeFile(configPath, `${JSON.stringify({
+    ...DEFAULT_CONFIG,
+    ...config
+  }, null, 2)}\n`, "utf8");
+}
 
 function findImageioFfmpeg() {
   const sitePackagesRoots = isWindows
@@ -62,6 +84,70 @@ function findImageioFfmpeg() {
 }
 
 const localFfmpeg = findImageioFfmpeg();
+
+function chromeUserDataDir() {
+  if (isWindows) {
+    return join(process.env.LOCALAPPDATA || "", "Google", "Chrome", "User Data");
+  }
+
+  if (process.platform === "darwin") {
+    return join(process.env.HOME || "", "Library", "Application Support", "Google", "Chrome");
+  }
+
+  return join(process.env.HOME || "", ".config", "google-chrome");
+}
+
+async function readJsonFile(filePath) {
+  return JSON.parse(await readFile(filePath, "utf8"));
+}
+
+async function listChromeProfiles() {
+  const root = chromeUserDataDir();
+  const config = await readConfig();
+  let lastUsed = "";
+
+  try {
+    const localState = await readJsonFile(join(root, "Local State"));
+    lastUsed = localState.profile?.last_used || "";
+  } catch {
+    // Chrome may not be installed or may not have created Local State yet.
+  }
+
+  const profiles = [];
+  if (!existsSync(root)) {
+    return { root, selected: config.chromeProfile, profiles };
+  }
+
+  for (const id of readdirSync(root).filter(name => name === "Default" || /^Profile \d+$/.test(name)).sort()) {
+    const prefsPath = join(root, id, "Preferences");
+    const cookiesPath = join(root, id, "Cookies");
+    let name = id;
+    let signedIn = false;
+
+    try {
+      const prefs = await readJsonFile(prefsPath);
+      name = prefs.profile?.name || id;
+      signedIn = Boolean(prefs.account_info?.length);
+    } catch {
+      // Keep the folder id as the display name.
+    }
+
+    profiles.push({
+      id,
+      name,
+      signedIn,
+      hasCookies: existsSync(cookiesPath),
+      isLastUsed: id === lastUsed,
+      selected: id === config.chromeProfile
+    });
+  }
+
+  return { root, selected: config.chromeProfile, profiles };
+}
+
+function chromeCookieSource(profile) {
+  return profile ? `chrome:${profile}` : "chrome";
+}
 
 function sendJson(res, status, body) {
   const json = JSON.stringify(body);
@@ -292,7 +378,7 @@ function detectPlatform(value) {
   }
 }
 
-function makeArgs({ url, format, platform }) {
+function makeArgs({ url, format, platform, chromeProfile = "" }) {
   const suffix = format === "mp3" ? "audio" : "video";
   const outputTemplate = join(downloadsDir, `%(title).180B [%(id)s] ${suffix}.%(ext)s`);
   const common = [
@@ -306,7 +392,7 @@ function makeArgs({ url, format, platform }) {
     "1",
     "--abort-on-unavailable-fragment",
     "--cookies-from-browser",
-    "chrome",
+    chromeCookieSource(chromeProfile),
     "-o",
     outputTemplate
   ];
@@ -345,8 +431,17 @@ function makeArgs({ url, format, platform }) {
 
 function runProcess(command, args, options = {}) {
   return new Promise((resolvePromise, reject) => {
-    const child = spawn(command, args, options);
+    const { timeoutMs, ...spawnOptions } = options;
+    const child = spawn(command, args, spawnOptions);
     let output = "";
+    let timeout = null;
+
+    if (timeoutMs) {
+      timeout = setTimeout(() => {
+        child.kill("SIGTERM");
+        reject(new Error("Command timed out."));
+      }, timeoutMs);
+    }
 
     child.stdout?.on("data", chunk => {
       output += chunk.toString();
@@ -354,8 +449,12 @@ function runProcess(command, args, options = {}) {
     child.stderr?.on("data", chunk => {
       output += chunk.toString();
     });
-    child.on("error", reject);
+    child.on("error", error => {
+      if (timeout) clearTimeout(timeout);
+      reject(error);
+    });
     child.on("close", code => {
+      if (timeout) clearTimeout(timeout);
       if (code === 0) {
         resolvePromise(output);
       } else {
@@ -363,6 +462,94 @@ function runProcess(command, args, options = {}) {
       }
     });
   });
+}
+
+async function getYtDlpVersion() {
+  if (!existsSync(localPython)) return "";
+  try {
+    return (await runProcess(localPython, ["-m", "yt_dlp", "--version"], {
+      cwd: appDir,
+      timeoutMs: 10_000
+    })).trim();
+  } catch {
+    return "";
+  }
+}
+
+async function runDiagnostics(url = "") {
+  const config = await readConfig();
+  const profileInfo = await listChromeProfiles();
+  const diagnostics = {
+    ok: true,
+    helperVersion: HELPER_VERSION,
+    node: process.version,
+    platform: process.platform,
+    chromeProfile: config.chromeProfile,
+    chromeProfiles: profileInfo.profiles,
+    checks: []
+  };
+
+  const addCheck = (name, ok, message) => {
+    diagnostics.checks.push({ name, ok, message });
+    if (!ok) diagnostics.ok = false;
+  };
+
+  addCheck("Helper", true, "Helper is running.");
+  addCheck("Python engine", existsSync(localPython), existsSync(localPython) ? "Installed." : "Missing. Run installer again.");
+  addCheck("FFmpeg", existsSync(localFfmpeg), existsSync(localFfmpeg) ? "Installed." : "Missing. Run installer again.");
+  addCheck("Chrome profiles", profileInfo.profiles.length > 0, profileInfo.profiles.length ? `${profileInfo.profiles.length} profile(s) found.` : "No Chrome profiles found.");
+
+  if (config.chromeProfile) {
+    const selected = profileInfo.profiles.find(profile => profile.id === config.chromeProfile);
+    addCheck("Selected Chrome profile", Boolean(selected), selected ? `${selected.name} selected.` : "Selected profile no longer exists.");
+    if (selected) {
+      addCheck("Profile cookies", selected.hasCookies, selected.hasCookies ? "Cookie database found." : "No cookie database found for selected profile.");
+    }
+  } else {
+    addCheck("Selected Chrome profile", false, "No profile selected. Choose the Chrome profile you use for YouTube/Instagram.");
+  }
+
+  const ytDlpVersion = await getYtDlpVersion();
+  diagnostics.ytDlpVersion = ytDlpVersion;
+  addCheck("Downloader engine", Boolean(ytDlpVersion), ytDlpVersion ? `yt-dlp ${ytDlpVersion}` : "yt-dlp missing. Click Update helper or run installer.");
+
+  const cleanedUrl = cleanMediaUrl(url);
+  if (cleanedUrl) {
+    const platform = detectPlatform(cleanedUrl);
+    diagnostics.url = cleanedUrl;
+    diagnostics.urlPlatform = platform;
+    addCheck("Link support", Boolean(platform), platform ? `${platform} link detected.` : "Only YouTube and Instagram links are supported.");
+
+    if (platform && existsSync(localPython)) {
+      try {
+        const output = await runProcess(localPython, [
+          "-m",
+          "yt_dlp",
+          "--simulate",
+          "--no-playlist",
+          "--cookies-from-browser",
+          chromeCookieSource(config.chromeProfile),
+          "--print",
+          "%(extractor)s:%(id)s",
+          cleanedUrl
+        ], {
+          cwd: appDir,
+          timeoutMs: 35_000,
+          env: {
+            ...process.env,
+            PATH: existsSync(bundledNodeBin)
+              ? `${bundledNodeBin}:${process.env.PATH || ""}`
+              : process.env.PATH
+          }
+        });
+        addCheck("Link extraction", true, output.trim().split(/\r?\n/).pop() || "Link can be read.");
+      } catch (error) {
+        addCheck("Link extraction", false, humanError({ text: error.message, platform }));
+      }
+    }
+  }
+
+  return diagnostics;
 }
 
 async function makeQuickTimeCompatible(job) {
@@ -460,7 +647,7 @@ function updateProgress(job, text) {
   }
 }
 
-function startJob({ url, format, platform }) {
+function startJob({ url, format, platform, chromeProfile = "" }) {
   const id = randomUUID();
   const job = {
     id,
@@ -482,8 +669,8 @@ function startJob({ url, format, platform }) {
   const usesLocalPython = existsSync(localPython);
   const ytDlpCommand = usesLocalPython ? localPython : existsSync(localYtDlp) ? localYtDlp : "yt-dlp";
   const ytDlpArgs = usesLocalPython
-    ? ["-m", "yt_dlp", ...makeArgs({ url, format, platform })]
-    : makeArgs({ url, format, platform });
+    ? ["-m", "yt_dlp", ...makeArgs({ url, format, platform, chromeProfile })]
+    : makeArgs({ url, format, platform, chromeProfile });
   const child = spawn(ytDlpCommand, ytDlpArgs, {
     cwd: appDir,
     env: {
@@ -605,7 +792,51 @@ const server = createServer(async (req, res) => {
   }
 
   if (req.method === "GET" && req.url === "/api/health") {
-    sendJson(res, 200, { ok: true, version: HELPER_VERSION });
+    const config = await readConfig();
+    sendJson(res, 200, {
+      ok: true,
+      version: HELPER_VERSION,
+      chromeProfile: config.chromeProfile
+    });
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/api/profiles") {
+    sendJson(res, 200, await listChromeProfiles());
+    return;
+  }
+
+  if (req.method === "POST" && req.url === "/api/profile") {
+    try {
+      const body = JSON.parse(await readBody(req));
+      const profileId = String(body.profile || "").trim();
+      const profileInfo = await listChromeProfiles();
+
+      if (profileId && !profileInfo.profiles.some(profile => profile.id === profileId)) {
+        sendJson(res, 400, { error: "Selected Chrome profile was not found." });
+        return;
+      }
+
+      await writeConfig({ chromeProfile: profileId });
+      sendJson(res, 200, {
+        ok: true,
+        selected: profileId
+      });
+    } catch (error) {
+      sendJson(res, 400, { error: error.message });
+    }
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/api/diagnostics") {
+    try {
+      sendJson(res, 200, await runDiagnostics(requestUrl.searchParams.get("url") || ""));
+    } catch (error) {
+      sendJson(res, 500, {
+        ok: false,
+        error: error.message
+      });
+    }
     return;
   }
 
@@ -664,7 +895,13 @@ const server = createServer(async (req, res) => {
         return;
       }
 
-      const job = startJob({ url, format, platform });
+      const config = await readConfig();
+      const job = startJob({
+        url,
+        format,
+        platform,
+        chromeProfile: config.chromeProfile
+      });
       sendJson(res, 202, { ...job, platform });
     } catch (error) {
       sendJson(res, 400, { error: error.message });
