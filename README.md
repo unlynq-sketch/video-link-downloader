@@ -15,6 +15,16 @@ This project does not bypass DRM, paywalls, login walls, private accounts, or pl
 
 For now, every other platform is blocked on purpose.
 
+## Reliability Controls
+
+The extension includes three helper tools for new devices:
+
+- `Chrome profile`: choose the same Chrome profile where you are logged into YouTube or Instagram.
+- `Run diagnostics`: checks helper connection, downloader engine, FFmpeg, Chrome profiles, cookies, and the pasted link.
+- `Update helper`: updates the local downloader engine and helper files without reinstalling the extension.
+
+If YouTube blocks a stream with `403`, try selecting the correct Chrome profile first, then run diagnostics. Some YouTube links may still be blocked by YouTube stream protection even when the helper is healthy.
+
 ## Mac Install
 
 Simple way:
@@ -95,6 +105,7 @@ This tested copy uses a local helper environment with:
 
 - `yt-dlp`
 - `ffmpeg` through `imageio-ffmpeg`
+- `curl-cffi` for browser-style network requests
 
 If you ever need to recreate the helper environment from scratch:
 
@@ -103,7 +114,8 @@ cd helper
 python3 -m venv .venv
 . .venv/bin/activate
 python -m pip install --upgrade pip
-python -m pip install yt-dlp imageio-ffmpeg
+python -m pip install --upgrade --pre yt-dlp
+python -m pip install imageio-ffmpeg curl-cffi
 ```
 
 ## Start The Helper
