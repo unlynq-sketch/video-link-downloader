@@ -165,7 +165,10 @@ async function loadProfiles() {
 
   const automatic = document.createElement("option");
   automatic.value = "";
-  automatic.textContent = "Automatic Chrome profile";
+  const effective = profiles.find(profile => profile.id === data.effective);
+  automatic.textContent = effective
+    ? `Automatic (${effective.name || effective.id})`
+    : "Automatic Chrome profile";
   chromeProfileSelect.append(automatic);
 
   for (const profile of profiles) {

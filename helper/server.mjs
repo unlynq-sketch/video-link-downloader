@@ -115,7 +115,12 @@ async function listChromeProfiles() {
 
   const profiles = [];
   if (!existsSync(root)) {
-    return { root, selected: config.chromeProfile, profiles };
+    return {
+      root,
+      selected: config.chromeProfile,
+      effective: "",
+      profiles
+    };
   }
 
   for (const id of readdirSync(root).filter(name => name === "Default" || /^Profile \d+$/.test(name)).sort()) {
@@ -142,11 +147,23 @@ async function listChromeProfiles() {
     });
   }
 
-  return { root, selected: config.chromeProfile, profiles };
+  return {
+    root,
+    selected: config.chromeProfile,
+    effective: effectiveChromeProfile({ profiles }, config.chromeProfile),
+    profiles
+  };
 }
 
 function chromeCookieSource(profile) {
   return profile ? `chrome:${profile}` : "chrome";
+}
+
+function effectiveChromeProfile(profileInfo, configuredProfile = "") {
+  if (configuredProfile) return configuredProfile;
+  return profileInfo.profiles.find(profile => profile.isLastUsed)?.id
+    || profileInfo.profiles.find(profile => profile.id === "Default")?.id
+    || "";
 }
 
 function sendJson(res, status, body) {
@@ -479,12 +496,14 @@ async function getYtDlpVersion() {
 async function runDiagnostics(url = "") {
   const config = await readConfig();
   const profileInfo = await listChromeProfiles();
+  const effectiveProfile = effectiveChromeProfile(profileInfo, config.chromeProfile);
   const diagnostics = {
     ok: true,
     helperVersion: HELPER_VERSION,
     node: process.version,
     platform: process.platform,
     chromeProfile: config.chromeProfile,
+    effectiveChromeProfile: effectiveProfile,
     chromeProfiles: profileInfo.profiles,
     checks: []
   };
@@ -499,14 +518,15 @@ async function runDiagnostics(url = "") {
   addCheck("FFmpeg", existsSync(localFfmpeg), existsSync(localFfmpeg) ? "Installed." : "Missing. Run installer again.");
   addCheck("Chrome profiles", profileInfo.profiles.length > 0, profileInfo.profiles.length ? `${profileInfo.profiles.length} profile(s) found.` : "No Chrome profiles found.");
 
-  if (config.chromeProfile) {
-    const selected = profileInfo.profiles.find(profile => profile.id === config.chromeProfile);
-    addCheck("Selected Chrome profile", Boolean(selected), selected ? `${selected.name} selected.` : "Selected profile no longer exists.");
+  if (effectiveProfile) {
+    const selected = profileInfo.profiles.find(profile => profile.id === effectiveProfile);
+    const mode = config.chromeProfile ? "Selected" : "Automatic";
+    addCheck("Chrome profile", Boolean(selected), selected ? `${mode}: ${selected.name} (${selected.id}).` : "Selected profile no longer exists.");
     if (selected) {
-      addCheck("Profile cookies", selected.hasCookies, selected.hasCookies ? "Cookie database found." : "No cookie database found for selected profile.");
+      addCheck("Profile cookies", selected.hasCookies, selected.hasCookies ? "Cookie database found." : "No cookie database found for this profile.");
     }
   } else {
-    addCheck("Selected Chrome profile", false, "No profile selected. Choose the Chrome profile you use for YouTube/Instagram.");
+    addCheck("Chrome profile", false, "No Chrome profile available. Open Chrome and log in first.");
   }
 
   const ytDlpVersion = await getYtDlpVersion();
@@ -528,7 +548,7 @@ async function runDiagnostics(url = "") {
           "--simulate",
           "--no-playlist",
           "--cookies-from-browser",
-          chromeCookieSource(config.chromeProfile),
+          chromeCookieSource(effectiveProfile),
           "--print",
           "%(extractor)s:%(id)s",
           cleanedUrl
@@ -896,11 +916,12 @@ const server = createServer(async (req, res) => {
       }
 
       const config = await readConfig();
+      const profileInfo = await listChromeProfiles();
       const job = startJob({
         url,
         format,
         platform,
-        chromeProfile: config.chromeProfile
+        chromeProfile: effectiveChromeProfile(profileInfo, config.chromeProfile)
       });
       sendJson(res, 202, { ...job, platform });
     } catch (error) {
